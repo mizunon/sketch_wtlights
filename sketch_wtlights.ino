@@ -4,37 +4,42 @@
 #include <IRsend.h>
 #include <Wire.h>
 
-constexpr const char* const version = "1.53";
+constexpr const char* const version = "1.60";
 
 constexpr const int eeprom_address = 0;
 
-constexpr const int wtModeCount = 11;
-constexpr const int wtColors[] = { TFT_CYAN, TFT_RED, TFT_GREEN, TFT_BLUE, TFT_PURPLE, TFT_YELLOW, TFT_WHITE, TFT_LIGHTGRAY, TFT_DARKGREY, TFT_DARKGREY, TFT_BLACK };
-constexpr const char* const wtModeName[] = { "Nakamu", "Broooock", "Sharken", "Kintoki", "Smile", "Kiriyan", "WT_Kun", "All", "FadeIn", "Flash", "Off" };
+constexpr const int wtModeCount = 12;
+constexpr const int wtColors[] = { TFT_CYAN, TFT_RED, TFT_GREEN, TFT_BLUE, TFT_PURPLE, TFT_YELLOW, TFT_WHITE, TFT_LIGHTGRAY, TFT_DARKGREY, TFT_DARKGREY, TFT_DARKGREY, TFT_BLACK };
+constexpr const int wtColorsNeopixel[] = { 0x00ffff, 0xff0000, 0x00ff00, 0x0000ff, 0xff00ff, 0xffff00, 0xffffff, 0xbbbbbb, 0x888888, 0x444444, 0x222222, 0x000000 };
+constexpr const char* const wtModeName[] = { " Nakamu ", " Broooock ", " Sharken ", " Kintoki ", " Smile ", " Kiriyan ", " WT_Kun ", " All ", " FadeSync ", " FlashSync ", " FadeRand ", " Off " };
 
 constexpr const float sendTimeMillis = 100;
 
-constexpr const int rawPttnCount = 14;
 constexpr const int rawDataCount = 28;
 constexpr const char *codeStrData[] = {
   //Nakamu、Broooock、シャークん、きんとき、スマイル、きりやん、ワイテルくん
-
-  //通常点灯
-   "10000110" ,"10000001", "10000010" ,"10000100" ,"10000101" ,"10000011" ,"10000111"
-
-  //フェードイン（青の設定ビットわけわからん）
-  ,"10111000" ,"10110101" ,"10111001" ,"10110000" ,"10110100" ,"10111101" ,"10111100"
-
-  //フェードアウト
-  ,"10011100" ,"10010010" ,"10010100" ,"10011000" ,"10011010" ,"10010110" ,"10011110"
+   "a10000110" ,"a10000001", "a10000010" ,"a10000100" ,"a10000101" ,"a10000011" ,"a10000111"  //通常点灯
+  // "a10000110" ,"a10000001", "a10000010" ,"a10000100" ,"b10000010" ,"a10000011" ,"a10000111" //本当はこっちの方がスマイルさんの紫になるが当日の会場の色とズレる＆フェードイン紫が無いので・・・
+  ,"a10011100" ,"a10010010" ,"a10010100" ,"a10011000" ,"a10011010" ,"a10010110" ,"a10011110"  //フェードイン（紫のフェードインが無い）
+  ,"a10111000" ,"a10110101" ,"a10111001" ,"a10110000" ,"a10110100" ,"a10111101" ,"a10111100"  //フェードイン２（青の設定ビットわけわからん）
+  ,"a10101100" ,"a10100010", "a10100100" ,"a10101000" ,"a10101010" ,"a10100110" ,"a10101110"  //点滅(遅い)
+  ,"a10101101" ,"a10100011", "a10100101" ,"a10101001" ,"a10101011" ,"a10100111" ,"a10101111"  //点滅(早い)
 };
-constexpr const char *codeStrDataOff = "10000000";
+constexpr const char *codeStrDataFadeRandSlow = "b01100000";
+constexpr const char *codeStrDataFadeRandFast = "b01100001";
+constexpr const char *codeStrDataOff = "a10000000";
+
+/// 4TのパターンBプロトコルメモ
+/// https://docs.google.com/spreadsheets/d/1z6DeR_bfE9Xn-Ck9KBPxR3s_5bTczSzXIgt5QId3XPs/edit?usp=sharing
 
 /* ------------------ */
 
 IRsend *irsend; 
 uint16_t kIrLed = 0;  // ESP8266 GPIO pin to use.
 uint16_t send_data_buff[rawDataCount];
+
+uint16_t kRgbLed = 0;
+bool haveDisplay = false;
 
 int display_h =0;
 int display_w =0;
@@ -56,15 +61,19 @@ void buildSendData( const char *data_string, uint16_t *send_data_buff )
   const uint16_t trailer_1_us = unit_us;
   const uint16_t trailer_0_us = unit_us * 2;
   const uint16_t data0_0_us = unit_us * 1;
-  const uint16_t data1_0_us = unit_us * 2;
+  const uint16_t data1a_0_us = unit_us * 2;  //ここが2と4で機能が変わる
+  const uint16_t data1b_0_us = unit_us * 4;  //ここが2と4で機能が変わる
 
   ///リーダー部
   *send_data_buff++ = leader_1_us;
   *send_data_buff++ = leader_0_us;
 
+  //1のspace時間を判定。
+  uint16_t data1_0_us = data1a_0_us;
+  if( *data_string++ == 'b' ) data1_0_us = data1b_0_us;
+
   ///データ部
   uint8_t data = 0;
-
   for( int i = 0 ; i < 8 ; i++ ){
     char c = *data_string++;
 
@@ -102,31 +111,62 @@ void buildSendData( const char *data_string, uint16_t *send_data_buff )
 void setup(void) {
   auto cfg = M5.config();
   M5.begin(cfg);
-  M5.Display.setTextSize(2);
 
-  display_h = M5.Display.height();
-  display_w = M5.Display.width();
-
+  /// Model: https://docs.m5stack.com/ja/products?id=%E3%82%B3%E3%83%B3%E3%83%88%E3%83%AD%E3%83%BC%E3%83%A9%E3%83%BCAtom_id
+  /// Model_ID: https://github.com/m5stack/M5GFX/blob/master/src/lgfx/boards.hpp#L59
   switch(M5.getBoard()) {
     case m5::board_t::board_M5StickC:
       kIrLed = 9;
+      kRgbLed = 0;
+      haveDisplay = true;
       break;
     case m5::board_t::board_M5StickCPlus:
       kIrLed = 9;
+      kRgbLed = 0;
+      haveDisplay = true;
       break;
     case m5::board_t::board_M5StickCPlus2:
       kIrLed = 19;
+      kRgbLed = 0;
+      haveDisplay = true;
       break;
     case m5::board_t::board_M5Atom:
       kIrLed = 12;
+      kRgbLed = 27;
+      haveDisplay = false;
+      break;
+    case m5::board_t::board_M5AtomMatrix:
+      kIrLed = 12;
+      kRgbLed = 27;
+      haveDisplay = false;
+      break;
+    case m5::board_t::board_M5AtomU:
+      kIrLed = 12;
+      kRgbLed = 27;
+      haveDisplay = false;
       break;
     case m5::board_t::board_M5AtomS3:
       kIrLed = 4;
+      kRgbLed = 0;
+      haveDisplay = true;
       break;
     case m5::board_t::board_M5AtomS3Lite:
       kIrLed = 4;
+      kRgbLed = 35;
+      haveDisplay = false;
+      break;
+    case m5::board_t::board_M5AtomS3U:
+      kIrLed = 12;
+      kRgbLed = 35;
+      haveDisplay = false;
       break;
   }
+
+  if( haveDisplay ){
+    display_h = M5.Display.height();
+    display_w = M5.Display.width();
+  }
+
   irsend = new IRsend(kIrLed);
   irsend->begin();
 
@@ -240,22 +280,30 @@ void loop(void) {
     }
 
     if( wtmode_cur == 10 ){
+      ///ランダムフェード
+      wtmode_led = -2;
+    }
+
+    if( wtmode_cur == 11 ){
       ///Offモード
       wtmode_led = -1;
     }
   }
 
   ///赤外線データ送信処理
-  if( -1 <= wtmode_led ){
+  if( -2 <= wtmode_led ){
     float current = millis();
 
     if( sendTimeMillis < (current - lastMillisSend) ){
       lastMillisSend = current;
 
-      Serial.printf("irsend->sendRaw Ver:%s, pin:%d, cur:%d, led:%d\n", version, kIrLed, wtmode_cur, wtmode_led);
+      Serial.printf("irsend->sendRaw Ver:%s, ir_pin:%d, rgb_pin:%d, cur:%d, led:%d\n", version, kIrLed, kRgbLed, wtmode_cur, wtmode_led);
 
       if( wtmode_led == -1 ){
         buildSendData( codeStrDataOff, send_data_buff);
+        irsend->sendRaw(send_data_buff, rawDataCount, 38);  // Send a raw data at 38kHz.
+      }else if( wtmode_led == -2 ){
+        buildSendData( codeStrDataFadeRandSlow, send_data_buff);
         irsend->sendRaw(send_data_buff, rawDataCount, 38);  // Send a raw data at 38kHz.
       }else{
         buildSendData( codeStrData[wtmode_led], send_data_buff);
@@ -272,25 +320,39 @@ void loop(void) {
 
   ///画面更新処理
   if( updateDisp ) {
-    if (!M5.Display.displayBusy())
+    if ( haveDisplay && !M5.Display.displayBusy())
     {
       M5.Display.startWrite();
       M5.Display.setClipRect(0, 0, display_w, display_h);
       M5.Display.waitDisplay();
 
       M5.Display.fillScreen(TFT_BLACK);
+
+      M5.Display.setTextSize(2);
       M5.Display.setCursor(0, 0);
 
+      //選択中のモード
       M5.Display.fillRect(0, 0, display_w, display_h, wtColors[wtmode_chg]);
+      M5.Display.drawCentreString(wtModeName[wtmode_chg], display_w / 2, display_h / 2, (uint8_t)1);
 
-      M5.Display.setCursor( (display_w / 2) - (strlen(wtModeName[wtmode_chg]) / 2 * 16) , display_h / 2);
-      M5.Display.print(wtModeName[wtmode_chg]);
+      //現在のモード
+      const int font_h = 16;
+      M5.Display.fillRect(0, 0, display_w, font_h * 2, wtColors[wtmode_cur]);
+      M5.Display.drawCentreString("^^^", display_w / 2, font_h * 0, (uint8_t)0);
+      M5.Display.drawCentreString(wtModeName[wtmode_cur], display_w / 2, font_h * 1, (uint8_t)0);
+      M5.Display.fillRect(0, font_h * 2, display_w, 2, wtColors[wtmode_cur]);
+      M5.Display.fillRect(0, font_h * 2 + 2, display_w, 4, TFT_BLACK);
 
       M5.Display.clearClipRect();
       M5.Display.endWrite();
 
       M5.Display.display();
       updateDisp = false;
+    }
+
+    if( 0 < kRgbLed ){
+      neopixelWrite(kRgbLed, wtColorsNeopixel[wtmode_chg] >> 16 & 0x0f, wtColorsNeopixel[wtmode_chg] >> 8 & 0x0f, wtColorsNeopixel[wtmode_chg] & 0x0f );
+      delay(10);
     }
   }
 
