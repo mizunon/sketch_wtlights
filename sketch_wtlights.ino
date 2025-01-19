@@ -4,7 +4,7 @@
 #include <IRsend.h>
 #include <Wire.h>
 
-constexpr const char* const version = "1.60";
+constexpr const char* const version = "V1.61";
 
 constexpr const int eeprom_address = 0;
 
@@ -342,6 +342,9 @@ void loop(void) {
       M5.Display.drawCentreString(wtModeName[wtmode_cur], display_w / 2, font_h * 1, (uint8_t)0);
       M5.Display.fillRect(0, font_h * 2, display_w, 2, wtColors[wtmode_cur]);
       M5.Display.fillRect(0, font_h * 2 + 2, display_w, 4, TFT_BLACK);
+
+      M5.Display.drawCentreString( version, display_w / 2, display_h - font_h * 2, (uint8_t)0);
+      M5.Display.drawCentreString( "@mizunon", display_w / 2, display_h - font_h * 1, (uint8_t)0);
 
       M5.Display.clearClipRect();
       M5.Display.endWrite();
