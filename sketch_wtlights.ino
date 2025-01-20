@@ -4,14 +4,14 @@
 #include <IRsend.h>
 #include <Wire.h>
 
-constexpr const char* const version = "V1.61";
+constexpr const char* const version = " V1.65 ";
 
 constexpr const int eeprom_address = 0;
 
-constexpr const int wtModeCount = 12;
-constexpr const int wtColors[] = { TFT_CYAN, TFT_RED, TFT_GREEN, TFT_BLUE, TFT_PURPLE, TFT_YELLOW, TFT_WHITE, TFT_LIGHTGRAY, TFT_DARKGREY, TFT_DARKGREY, TFT_DARKGREY, TFT_BLACK };
-constexpr const int wtColorsNeopixel[] = { 0x00ffff, 0xff0000, 0x00ff00, 0x0000ff, 0xff00ff, 0xffff00, 0xffffff, 0xbbbbbb, 0x888888, 0x444444, 0x222222, 0x000000 };
-constexpr const char* const wtModeName[] = { " Nakamu ", " Broooock ", " Sharken ", " Kintoki ", " Smile ", " Kiriyan ", " WT_Kun ", " All ", " FadeSync ", " FlashSync ", " FadeRand ", " Off " };
+constexpr const int wtModeCount = 13;
+constexpr const int wtColors[] = { TFT_CYAN, TFT_RED, TFT_GREEN, TFT_BLUE, TFT_PURPLE, TFT_YELLOW, TFT_WHITE, TFT_LIGHTGRAY, TFT_DARKGREY, TFT_DARKGREY, TFT_DARKGREY, TFT_DARKGREY, TFT_BLACK };
+constexpr const int wtColorsNeopixel[] = { 0x00ffff, 0xff0000, 0x00ff00, 0x0000ff, 0xff00ff, 0xffff00, 0xffffff, 0xdddddd, 0xbbbbbb, 0x999999, 0x777777, 0x555555, 0x000000 };
+constexpr const char* const wtModeName[] = { " Nakamu ", " Broooock ", " Sharken ", " Kintoki ", " Smile ", " Kiriyan ", " WT_Kun ", " All ", " FadeSync ", " FlashSync ", " FadeRand ", " FlashRand ", " Off " };
 
 constexpr const float sendTimeMillis = 100;
 
@@ -27,6 +27,8 @@ constexpr const char *codeStrData[] = {
 };
 constexpr const char *codeStrDataFadeRandSlow = "b01100000";
 constexpr const char *codeStrDataFadeRandFast = "b01100001";
+constexpr const char *codeStrDataFlashRand0 = "b01000101";
+constexpr const char *codeStrDataFlashRand1 = "b01000011";
 constexpr const char *codeStrDataOff = "a10000000";
 
 /// 4TのパターンBプロトコルメモ
@@ -285,13 +287,23 @@ void loop(void) {
     }
 
     if( wtmode_cur == 11 ){
+      ///フラッシュモード
+      if( 1000 < current - lastMillisMode ){
+        if( -3 <= wtmode_led ) wtmode_led = -4;
+        else wtmode_led = -3;
+
+        lastMillisMode = current;
+      }
+    }
+
+    if( wtmode_cur == 12 ){
       ///Offモード
       wtmode_led = -1;
     }
   }
 
   ///赤外線データ送信処理
-  if( -2 <= wtmode_led ){
+  if( -4 <= wtmode_led ){
     float current = millis();
 
     if( sendTimeMillis < (current - lastMillisSend) ){
@@ -304,6 +316,12 @@ void loop(void) {
         irsend->sendRaw(send_data_buff, rawDataCount, 38);  // Send a raw data at 38kHz.
       }else if( wtmode_led == -2 ){
         buildSendData( codeStrDataFadeRandSlow, send_data_buff);
+        irsend->sendRaw(send_data_buff, rawDataCount, 38);  // Send a raw data at 38kHz.
+      }else if( wtmode_led == -3 ){
+        buildSendData( codeStrDataFlashRand0, send_data_buff);
+        irsend->sendRaw(send_data_buff, rawDataCount, 38);  // Send a raw data at 38kHz.
+      }else if( wtmode_led == -4 ){
+        buildSendData( codeStrDataFlashRand1, send_data_buff);
         irsend->sendRaw(send_data_buff, rawDataCount, 38);  // Send a raw data at 38kHz.
       }else{
         buildSendData( codeStrData[wtmode_led], send_data_buff);
