@@ -189,21 +189,6 @@ void setup(void) {
 
   if( wtmode_cur <= -1 || wtModeCount <= wtmode_cur ) wtmode_cur = 0;
   wtmode_chg = wtmode_cur;
-
-  //ボード名の取得
-  const char* name;
-  {
-    switch (M5.getBoard()) {
-      case m5::board_t::board_M5StickC:       name = "M5StickC";  break;
-      case m5::board_t::board_M5StickCPlus:   name = "M5StickCPlus";  break;
-      case m5::board_t::board_M5StickCPlus2:  name = "M5StickCPlus2"; break;
-      case m5::board_t::board_M5Atom:         name = "M5Atom";  break;
-      case m5::board_t::board_M5AtomS3:       name = "M5AtomS3";  break;
-      default:                                name = "Other Device";  break;
-    }
-    Serial.printf("core:%s\n", name);
-  }
-
 }
 
 /*********** Arduino loop 関数 ***********/
@@ -317,8 +302,6 @@ void loop(void) {
     if( sendTimeMillis < (current - lastMillisSend) ){
       lastMillisSend = current;
 
-      Serial.printf("irsend->sendRaw Ver:%s, ir_pin:%d, rgb_pin:%d, cur:%d, led:%d\n", version, kIrLed, kRgbLed, wtmode_cur, wtmode_led);
-
       if( wtmode_led == -1 ){
         buildSendData( codeStrDataOff, send_data_buff);
         irsend->sendRaw(send_data_buff, rawDataCount, 38);  // Send a raw data at 38kHz.
@@ -376,13 +359,16 @@ void loop(void) {
       M5.Display.endWrite();
 
       M5.Display.display();
-      updateDisp = false;
     }
 
     if( 0 < kRgbLed ){
       neopixelWrite(kRgbLed, wtColorsNeopixel[wtmode_chg] >> 16 & 0x0f, wtColorsNeopixel[wtmode_chg] >> 8 & 0x0f, wtColorsNeopixel[wtmode_chg] & 0x0f );
       delay(10);
     }
+
+    
+    Serial.printf("Update Display Ver:%s, ir_pin:%d, rgb_pin:%d, cur:%d, led:%d\n", version, kIrLed, kRgbLed, wtmode_cur, wtmode_led);
+    updateDisp = false;
   }
 
   delay(1);
