@@ -4,55 +4,60 @@
 #include <IRsend.h>
 #include <Wire.h>
 
+/*********** グローバル定数たち ***********/
+
 constexpr const char* const version = " V1.65 ";
 
-constexpr const int eeprom_address = 0;
+constexpr const int eeprom_address = 0; //EEPROMの使用アドレス。
 
-constexpr const int wtModeCount = 13;
+constexpr const int wtModeCount = 13; //全モード数。↓のモードを増やしたら、ここも増やさないとダメ
 constexpr const int wtColors[] = { TFT_CYAN, TFT_RED, TFT_GREEN, TFT_BLUE, TFT_PURPLE, TFT_YELLOW, TFT_WHITE, TFT_LIGHTGRAY, TFT_DARKGREY, TFT_DARKGREY, TFT_DARKGREY, TFT_DARKGREY, TFT_BLACK };
 constexpr const int wtColorsNeopixel[] = { 0x00ffff, 0xff0000, 0x00ff00, 0x0000ff, 0xff00ff, 0xffff00, 0xffffff, 0xdddddd, 0xbbbbbb, 0x999999, 0x777777, 0x555555, 0x000000 };
 constexpr const char* const wtModeName[] = { " Nakamu ", " Broooock ", " Sharken ", " Kintoki ", " Smile ", " Kiriyan ", " WT_Kun ", " All ", " FadeSync ", " FlashSync ", " FadeRand ", " FlashRand ", " Off " };
 
-constexpr const float sendTimeMillis = 100;
+constexpr const float sendTimeMillis = 100; //赤外線データの送信間隔ms
 
-constexpr const int rawDataCount = 28;
+constexpr const int rawDataCount = 28;  //赤外線データの総データ数。
 constexpr const char *codeStrData[] = {
   //Nakamu、Broooock、シャークん、きんとき、スマイル、きりやん、ワイテルくん
+  //頭の1文字： a=2Tモード b=4Tモード
    "a10000110" ,"a10000001", "a10000010" ,"a10000100" ,"a10000101" ,"a10000011" ,"a10000111"  //通常点灯
-  // "a10000110" ,"a10000001", "a10000010" ,"a10000100" ,"b10000010" ,"a10000011" ,"a10000111" //本当はこっちの方がスマイルさんの紫になるが当日の会場の色とズレる＆フェードイン紫が無いので・・・
+  // "a10000110" ,"a10000001", "a10000010" ,"a10000100" ,"b10000010" ,"a10000011" ,"a10000111" //本当はこっちの方がスマさんの紫になるが当日の会場の色とズレる＆フェードイン紫が無いので・・・
   ,"a10011100" ,"a10010010" ,"a10010100" ,"a10011000" ,"a10011010" ,"a10010110" ,"a10011110"  //フェードイン（紫のフェードインが無い）
   ,"a10111000" ,"a10110101" ,"a10111001" ,"a10110000" ,"a10110100" ,"a10111101" ,"a10111100"  //フェードイン２（青の設定ビットわけわからん）
   ,"a10101100" ,"a10100010", "a10100100" ,"a10101000" ,"a10101010" ,"a10100110" ,"a10101110"  //点滅(遅い)
   ,"a10101101" ,"a10100011", "a10100101" ,"a10101001" ,"a10101011" ,"a10100111" ,"a10101111"  //点滅(早い)
 };
-constexpr const char *codeStrDataFadeRandSlow = "b01100000";
-constexpr const char *codeStrDataFadeRandFast = "b01100001";
-constexpr const char *codeStrDataFlashRand0 = "b01000101";
-constexpr const char *codeStrDataFlashRand1 = "b01000011";
-constexpr const char *codeStrDataOff = "a10000000";
+constexpr const char *codeStrDataFadeRandSlow = "b01100000";  //ランダムフェード（遅め）
+constexpr const char *codeStrDataFadeRandFast = "b01100001";  //ランダムフェード（早め）
+constexpr const char *codeStrDataFlashRand0 = "b01000101";  //ランダム点灯（↓のとの組み合わせで、色変化が起きる）
+constexpr const char *codeStrDataFlashRand1 = "b01000011";  //ランダム点灯
+constexpr const char *codeStrDataOff = "a10000000";  //消灯
 
-/// 4TのパターンBプロトコルメモ
+/// 4Tモードのパターンプロトコルメモ
 /// https://docs.google.com/spreadsheets/d/1z6DeR_bfE9Xn-Ck9KBPxR3s_5bTczSzXIgt5QId3XPs/edit?usp=sharing
 
-/* ------------------ */
+/*********** グローバル変数たち ***********/
 
-IRsend *irsend; 
-uint16_t kIrLed = 0;  // ESP8266 GPIO pin to use.
-uint16_t send_data_buff[rawDataCount];
+IRsend *irsend; //赤外線送信クラス
+uint16_t kIrLed = 0;  // IrLEDのGPIOピン番号
+uint16_t send_data_buff[rawDataCount];  //赤外線データ送信バッファ
 
-uint16_t kRgbLed = 0;
-bool haveDisplay = false;
+uint16_t kRgbLed = 0; // NeoPixel RGBLEDのGPIOピン番号
+bool haveDisplay = false; //ディスプレイがあるかないか。
 
-int display_h =0;
-int display_w =0;
+int display_h = 0;  //画面幅
+int display_w = 0;  //画面高さ
 
-signed int wtmode_led = 0;
-int wtmode_cur = 0;
-int wtmode_chg = 0;
-bool updateDisp = true;
+signed int wtmode_led = 0;  //送信するLEDデータID
+int wtmode_cur = 0; //現在送信中のモード
+int wtmode_chg = 0; //現在仮選択中のモード
+bool updateDisp = true; //画面更新フラグ
 
-float lastMillisSend = 0;
-float lastMillisMode = 0;
+float lastMillisSend = 0; //最後に赤外線を送信した時刻(ms)
+float lastMillisMode = 0; //最後のモード変化をした時刻(ms)
+
+/*********** グローバル関数たち ***********/
 
 void buildSendData( const char *data_string, uint16_t *send_data_buff )
 {
@@ -66,7 +71,7 @@ void buildSendData( const char *data_string, uint16_t *send_data_buff )
   const uint16_t data1a_0_us = unit_us * 2;  //ここが2と4で機能が変わる
   const uint16_t data1b_0_us = unit_us * 4;  //ここが2と4で機能が変わる
 
-  ///リーダー部
+  //リーダー部
   *send_data_buff++ = leader_1_us;
   *send_data_buff++ = leader_0_us;
 
@@ -74,7 +79,7 @@ void buildSendData( const char *data_string, uint16_t *send_data_buff )
   uint16_t data1_0_us = data1a_0_us;
   if( *data_string++ == 'b' ) data1_0_us = data1b_0_us;
 
-  ///データ部
+  //データ部
   uint8_t data = 0;
   for( int i = 0 ; i < 8 ; i++ ){
     char c = *data_string++;
@@ -92,7 +97,7 @@ void buildSendData( const char *data_string, uint16_t *send_data_buff )
     }
   }
 
-  ///パリティ部
+  //パリティ部
   data = ((data >> 4) & 0b1111) ^ (data & 0b1111);
   for( int i = 0 ; i < 4 ; i++ ){
     if( (data & 0b00001000) == 0 ){
@@ -105,10 +110,12 @@ void buildSendData( const char *data_string, uint16_t *send_data_buff )
     data = (data << 1) & 0b1111;
   }
 
-  ///トレイラー部
+  //トレイラー部
   *send_data_buff++ = trailer_1_us;
   *send_data_buff++ = trailer_0_us;
 }
+
+/*********** Arduino SetUp 関数 ***********/
 
 void setup(void) {
   auto cfg = M5.config();
@@ -120,17 +127,17 @@ void setup(void) {
     case m5::board_t::board_M5StickC:
       kIrLed = 9;
       kRgbLed = 0;
-      haveDisplay = true;
+      haveDisplay = true; // 80 x 160
       break;
     case m5::board_t::board_M5StickCPlus:
       kIrLed = 9;
       kRgbLed = 0;
-      haveDisplay = true;
+      haveDisplay = true; // 135 x 240
       break;
     case m5::board_t::board_M5StickCPlus2:
       kIrLed = 19;
       kRgbLed = 0;
-      haveDisplay = true;
+      haveDisplay = true; // 135 x 240
       break;
     case m5::board_t::board_M5Atom:
       kIrLed = 12;
@@ -150,7 +157,7 @@ void setup(void) {
     case m5::board_t::board_M5AtomS3:
       kIrLed = 4;
       kRgbLed = 0;
-      haveDisplay = true;
+      haveDisplay = true; // 128 x 128
       break;
     case m5::board_t::board_M5AtomS3Lite:
       kIrLed = 4;
@@ -199,10 +206,11 @@ void setup(void) {
 
 }
 
+/*********** Arduino loop 関数 ***********/
+
 void loop(void) {
   M5.update();  ///ボタン情報とか更新
 
-  static constexpr const int colors[] = { TFT_WHITE, TFT_CYAN, TFT_RED, TFT_YELLOW, TFT_BLUE, TFT_GREEN };
   static constexpr const char* const names[] = { "none", "wasHold", "wasClicked", "wasPressed", "wasReleased", "wasDeciedCount" };
 
   ///キー入力処理
