@@ -82,7 +82,7 @@ M5Stack開発キットシリーズの以下の開発キットに対応してい�
 - ライブLEDライトは、**開発キットからの赤外線が2秒間受信できないと自動的に消灯**します。一度ついたけど消えた場合は、上記の赤外線LEDの距離や向きを変えて試してみてください。
 
 ## インストール方法
-- Arduino IDEで、本プログラムを「Sketch」メニューから「Upload」して、開発キットに本プログラムを書き込んでください。
+- Arduino IDEで、本プログラム「[sketch_wtlights.ino](https://github.com/mizunon/sketch_wtlights/blob/main/sketch_wtlights.ino)」を「Sketch」メニューから「Upload」して、開発キットに本プログラムを書き込んでください。
 - Arduino IDE自体のインストールは下記の方のWebページがわかりやすいです。
   - あれさん / Arduino IDE 2.0でM5Stack開発環境を構築する
     - https://note.com/ats030/n/n0a3358b6d466
