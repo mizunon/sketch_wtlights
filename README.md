@@ -52,10 +52,11 @@ M5Stack開発キットシリーズの以下の開発キットに対応してい�
 このキットは、秋葉原にお店がある「[千石電商](https://www.sengoku.co.jp/shop_01.html)」さんや、「[スイッチサイエンス](https://www.switch-science.com/)」さん、Amazonで買えます。
 - M5StickC, M5StickC Plus, M5StickC Plus2 （4千円前後）
   - バッテリーが内蔵されています。外部のUSB電源でも動きます。
-  - 書き込みも動作も安定していて、赤外線出力も悪くない＆バッテリー内臓でいつでもどこでも光らせられる
+  - 書き込みも動作も安定していて、赤外線出力も悪くない＆バッテリー内臓でいつでもどこでも光らせられる。
+    - M5StickC Plus2以外のM5StickC, M5StickC Plusは旧機種なので、これから買う人はPlus2一択です。
   - 購入リンク
-    - M5StickC Plus https://ssci.to/9350
     - M5StickC Plus2 https://ssci.to/6470
+    - M5StickC Plus https://ssci.to/9350
 - ATOM Lite, ATOM Matrix （2～3千円）
   - バッテリーは内蔵されていません。外部のUSB電源が必要です。
   - このシリーズは赤外線送信パワーが弱いので、価格が安いこと以外はオススメしません。
