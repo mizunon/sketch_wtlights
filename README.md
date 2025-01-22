@@ -47,7 +47,8 @@
 
 
 ## 対応機種
-M5Stack開発キットシリーズの以下の開発キット。
+M5Stack開発キットシリーズの以下の開発キットに対応しています。  
+一番のオススメは「M5StickC Plus2」です。  
 このキットは、秋葉原にお店がある「[千石電商](https://www.sengoku.co.jp/shop_01.html)」さんや、「[スイッチサイエンス](https://www.switch-science.com/)」さん、Amazonで買えます。
 - M5StickC, M5StickC Plus, M5StickC Plus2 （4千円前後）
   - バッテリーが内蔵されています。外部のUSB電源でも動きます。
