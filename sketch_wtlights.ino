@@ -1,3 +1,8 @@
+///
+/// WTLights Controller for M5StickC / ATOM / ATOMS3
+/// Copyright to @mizunon / https://twitter.com/mizunon
+///
+
 #include "EEPROM.h"
 #include <M5Unified.h>
 #include <IRremoteESP8266.h>
@@ -6,16 +11,17 @@
 
 /*********** グローバル定数たち ***********/
 
-constexpr const char* const version = " V1.65 ";
+constexpr const char* const version = " V1.67 ";
 
 constexpr const int eeprom_address = 0; //EEPROMの使用アドレス。
 
-constexpr const int wtModeCount = 13; //全モード数。↓のモードを増やしたら、ここも増やさないとダメ
+constexpr const int wtModeCount = 13; //全モード数。↓のモードを増やしたら、以下の３つも増やさないとダメ
 constexpr const int wtColors[] = { TFT_CYAN, TFT_RED, TFT_GREEN, TFT_BLUE, TFT_PURPLE, TFT_YELLOW, TFT_WHITE, TFT_LIGHTGRAY, TFT_DARKGREY, TFT_DARKGREY, TFT_DARKGREY, TFT_DARKGREY, TFT_BLACK };
 constexpr const int wtColorsNeopixel[] = { 0x00ffff, 0xff0000, 0x00ff00, 0x0000ff, 0xff00ff, 0xffff00, 0xffffff, 0xdddddd, 0xbbbbbb, 0x999999, 0x777777, 0x555555, 0x000000 };
 constexpr const char* const wtModeName[] = { " Nakamu ", " Broooock ", " Sharken ", " Kintoki ", " Smile ", " Kiriyan ", " WT_Kun ", " All ", " FadeSync ", " FlashSync ", " FadeRand ", " FlashRand ", " Off " };
 
 constexpr const float sendTimeMillis = 100; //赤外線データの送信間隔ms
+constexpr const float sendNeoPixelUs = 50; //NeoPixel系LED間Wait（us） WS2812B的には RESET>280us なのでそれよりは短くないとNG
 
 constexpr const int rawDataCount = 28;  //赤外線データの総データ数。
 constexpr const char *codeStrData[] = {
@@ -44,6 +50,7 @@ uint16_t kIrLed = 0;  // IrLEDのGPIOピン番号
 uint16_t send_data_buff[rawDataCount];  //赤外線データ送信バッファ
 
 uint16_t kRgbLed = 0; // NeoPixel RGBLEDのGPIOピン番号
+uint16_t kRgbLedMode = 0; //NeoPixel RGBLEDの制御モード。0=1ピクセル、1=ATOM MATRIX
 bool haveDisplay = false; //ディスプレイがあるかないか。
 
 int display_h = 0;  //画面幅
@@ -147,6 +154,7 @@ void setup(void) {
     case m5::board_t::board_M5AtomMatrix:
       kIrLed = 12;
       kRgbLed = 27;
+      kRgbLedMode = 1;
       haveDisplay = false;
       break;
     case m5::board_t::board_M5AtomU:
@@ -362,11 +370,23 @@ void loop(void) {
     }
 
     if( 0 < kRgbLed ){
-      neopixelWrite(kRgbLed, wtColorsNeopixel[wtmode_chg] >> 16 & 0x0f, wtColorsNeopixel[wtmode_chg] >> 8 & 0x0f, wtColorsNeopixel[wtmode_chg] & 0x0f );
-      delay(10);
+      if( kRgbLedMode == 1 ){
+        //ATOM MATTIX特殊処理
+        for( int i = 0; i<5 ; i++ ){
+          neopixelWrite(kRgbLed, wtColorsNeopixel[wtmode_cur] >> 16 & 0x0f, wtColorsNeopixel[wtmode_cur] >> 8 & 0x0f, wtColorsNeopixel[wtmode_cur] & 0x0f );
+          delayMicroseconds(sendNeoPixelUs);
+        }
+
+        for( int i = 0; i<20 ; i++ ){
+          neopixelWrite(kRgbLed, wtColorsNeopixel[wtmode_chg] >> 16 & 0x0f, wtColorsNeopixel[wtmode_chg] >> 8 & 0x0f, wtColorsNeopixel[wtmode_chg] & 0x0f );
+          delayMicroseconds(sendNeoPixelUs);
+        }
+      }else{
+        //通常の１ピクセル処理
+        neopixelWrite(kRgbLed, wtColorsNeopixel[wtmode_chg] >> 16 & 0x0f, wtColorsNeopixel[wtmode_chg] >> 8 & 0x0f, wtColorsNeopixel[wtmode_chg] & 0x0f );
+      }
     }
 
-    
     Serial.printf("Update Display Ver:%s, ir_pin:%d, rgb_pin:%d, cur:%d, led:%d\n", version, kIrLed, kRgbLed, wtmode_cur, wtmode_led);
     updateDisp = false;
   }
