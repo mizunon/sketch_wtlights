@@ -159,6 +159,11 @@ Hard resetting via RTS pin...
 ## 他のライブのLEDライトの動作メモ
 ### 動作確認済機種
 動作確認したら追加。
+- 「Yuzuru Hanyu ICE STORY 2023 “GIFT”」
+  - 形がまんま
+  - https://x.com/jp_GIFTofficial/status/1629725616835788800
+- 「GLAY 30th Anniversary GLAY EXPO 2024-2025」LEDリストバンド
+  - 色の切り替えボタン付きでうらやましい
 
 ### 動作しない事の確認済機種
 動作しないことを確認したら追加。
@@ -168,9 +173,6 @@ Hard resetting via RTS pin...
 - 「BABYMETAL LEGEND-MM 神器」
   - この方のを見る限りプロトコル同じっぽい
   - https://qiita.com/tatsuki1119/items/7e2444da04b4cc24f004
-- 「Yuzuru Hanyu ICE STORY 2023 “GIFT”」
-  - 形がまんま
-  - https://x.com/jp_GIFTofficial/status/1629725616835788800
 - 「Kazuki Kato Concert Tour 2024 ～Respection～♪」
   - 形がまんま
   - https://x.com/kazuki_kato1007/status/1760652176911962221
