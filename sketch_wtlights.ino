@@ -3,6 +3,8 @@
 /// Copyright to @mizunon / https://twitter.com/mizunon
 ///
 
+#define IRRECV_H_ //IRRecv.hの読み込み抑制。ESP-IDFのV-Upでこれをしないとタイマー関係でエラー出まくる・・・
+
 #include "EEPROM.h"
 #include <M5Unified.h>
 #include <IRremoteESP8266.h>
@@ -10,15 +12,16 @@
 #include <Wire.h>
 
 /*********** グローバル定数たち ***********/
+#include "dot_e_array.h"
 
-constexpr const char* const version = " V1.67 ";
+constexpr const char* const version = "V1.70";
 
 constexpr const int eeprom_address = 0; //EEPROMの使用アドレス。
 
 constexpr const int wtModeCount = 13; //全モード数。↓のモードを増やしたら、以下の３つも増やさないとダメ
 constexpr const int wtColors[] = { TFT_CYAN, TFT_RED, TFT_GREEN, TFT_BLUE, TFT_PURPLE, TFT_YELLOW, TFT_WHITE, TFT_LIGHTGRAY, TFT_DARKGREY, TFT_DARKGREY, TFT_DARKGREY, TFT_DARKGREY, TFT_BLACK };
 constexpr const int wtColorsNeopixel[] = { 0x00ffff, 0xff0000, 0x00ff00, 0x0000ff, 0xff00ff, 0xffff00, 0xffffff, 0xdddddd, 0xbbbbbb, 0x999999, 0x777777, 0x555555, 0x000000 };
-constexpr const char* const wtModeName[] = { " Nakamu ", " Broooock ", " Sharken ", " Kintoki ", " Smile ", " Kiriyan ", " WT_Kun ", " All ", " FadeSync ", " FlashSync ", " FadeRand ", " FlashRand ", " Off " };
+constexpr const char* const wtModeName[] = { "Nakamu", "Broooock", "Sharken", "Kintoki", "Smile", "Kiriyan", "WT_Kun", "All", "FadeSync", "FlashSync", "FadeRand", "FlashRand", "Off " };
 
 constexpr const float sendTimeMillis = 100; //赤外線データの送信間隔ms
 constexpr const float sendNeoPixelUs = 50; //NeoPixel系LED間Wait（us） WS2812B的には RESET>280us なのでそれよりは短くないとNG
@@ -182,6 +185,7 @@ void setup(void) {
   if( haveDisplay ){
     display_h = M5.Display.height();
     display_w = M5.Display.width();
+    Serial.printf("display_h:%d display_w:%d\n", display_h, display_w);
   }
 
   irsend = new IRsend(kIrLed);
@@ -345,23 +349,66 @@ void loop(void) {
 
       M5.Display.fillScreen(TFT_BLACK);
 
-      M5.Display.setTextSize(2);
+      int font_h = display_w < 120 ? 8 : 16;
+      M5.Display.setTextSize( font_h / 8 );
       M5.Display.setCursor(0, 0);
 
       //選択中のモード
-      M5.Display.fillRect(0, 0, display_w, display_h, wtColors[wtmode_chg]);
-      M5.Display.drawCentreString(wtModeName[wtmode_chg], display_w / 2, display_h / 2, (uint8_t)1);
+      if( true ){
+        //メンバーカラー塗りつぶしのみモード
+        M5.Display.fillRect(0, 0, display_w, display_h, wtColors[wtmode_chg]);
+        M5.Display.drawCentreString(wtModeName[wtmode_chg], display_w / 2, display_h / 2, (uint8_t)1);
+      }else{
+        //ドット絵表示モード
+        M5.Display.fillRect(0, 0, display_w, display_h, wtColors[wtmode_chg]);
 
-      //現在のモード
-      const int font_h = 16;
-      M5.Display.fillRect(0, 0, display_w, font_h * 2, wtColors[wtmode_cur]);
-      M5.Display.drawCentreString("^^^", display_w / 2, font_h * 0, (uint8_t)0);
-      M5.Display.drawCentreString(wtModeName[wtmode_cur], display_w / 2, font_h * 1, (uint8_t)0);
-      M5.Display.fillRect(0, font_h * 2, display_w, 2, wtColors[wtmode_cur]);
-      M5.Display.fillRect(0, font_h * 2 + 2, display_w, 4, TFT_BLACK);
+        int pixel_step = display_w / 32;
+        if( display_h < 160 ) pixel_step--;
+        if( pixel_step <= 0 ) pixel_step = 1;
+        
+        int start_x = (display_w - pixel_step * 32) / 2;
+        int start_y = (font_h*1+4) + ( (display_h - (font_h*1+4) - (pixel_step*32)) / 2) ;
 
-      M5.Display.drawCentreString( version, display_w / 2, display_h - font_h * 2, (uint8_t)0);
-      M5.Display.drawCentreString( "@mizunon", display_w / 2, display_h - font_h * 1, (uint8_t)0);
+        //Serial.printf("display_h:%d display_w:%d pixel_step:%d start_x:%d start_y:%d\n", display_h, display_w, pixel_step, start_x, start_y);
+
+        int x = 0, y = 0;
+        while( y < 32 ){
+          int array_no = x + y * 32;
+          M5.Display.fillRect( start_x + x * pixel_step, start_y + y * pixel_step, pixel_step, pixel_step, dot_e_nakamu[array_no]);
+
+          x++;
+          if( 32 <= x ){
+            x = 0;
+            y++;
+          }
+        }
+      }
+
+      //現在出力中のモード
+      static char cmode_str[32];
+      sprintf( cmode_str, "^%s^",  wtModeName[wtmode_cur]);
+      M5.Display.fillRect(0, 0, display_w, font_h * 1, wtColors[wtmode_cur]);
+      M5.Display.drawCentreString(cmode_str, display_w / 2, 0, (uint8_t)0);
+      M5.Display.fillRect(0, font_h, display_w, 4, wtColors[wtmode_cur]);
+      M5.Display.fillRect(0, font_h + 4, display_w, 2, TFT_BLACK);
+
+      // M5.Display.fillRect(0, 0, display_w, font_h * 2, wtColors[wtmode_cur]);
+      // M5.Display.drawCentreString("^^^", display_w / 2, font_h * 0, (uint8_t)0);
+      // M5.Display.drawCentreString(wtModeName[wtmode_cur], display_w / 2, font_h * 1, (uint8_t)0);
+      // M5.Display.fillRect(0, font_h * 2, display_w, 2, wtColors[wtmode_cur]);
+      // M5.Display.fillRect(0, font_h * 2 + 2, display_w, 4, TFT_BLACK);
+
+      //Versions
+      font_h = 8;
+      M5.Display.setTextSize(1);
+      if( 120 <= display_w ){
+        static char ver_str[32];
+        sprintf( ver_str, " %s %s ", version, "@mizunon");
+        M5.Display.drawCentreString( ver_str, display_w / 2, display_h - font_h * 1, (uint8_t)0);
+      }else{
+        M5.Display.drawString( version, 0, display_h - font_h * 2, (uint8_t)0);
+        M5.Display.drawString( "@mizunon", 0, display_h - font_h * 1, (uint8_t)0);
+      }
 
       M5.Display.clearClipRect();
       M5.Display.endWrite();
